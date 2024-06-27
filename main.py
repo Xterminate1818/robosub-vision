@@ -1,60 +1,27 @@
 import numpy as np
 import cv2 as cv
+from pipeline import *
 
-cv.setUseOptimized(True)
-
-# HSV image -> red bitmask
-def red_mask(image_hsv):
-    # lower boundary RED color range values; Hue (0 - 10)
-    lower_1 = np.array([0, 100, 20])
-    upper_1 = np.array([10, 255, 255])
-     
-    # upper boundary RED color range values; Hue (160 - 180)
-    lower_2 = np.array([160,100,20])
-    upper_2 = np.array([179,255,255])
-     
-    lower_mask = cv.inRange(image_hsv, lower_1, upper_1)
-    upper_mask = cv.inRange(image_hsv, lower_2, upper_2)
-     
-    full_mask = lower_mask + upper_mask
-    return full_mask
-
-# HSV image -> blue bitmask
-def blue_mask(image_hsv):
-    # define range of blue color in HSV
-    lower = np.array([110,100,20])
-    upper = np.array([130,255,255])
-    return cv.inRange(image_hsv, lower, upper)
-
-
-cap = cv.VideoCapture(0)
-if not cap.isOpened():
-    print("Cannot open camera")
-    exit()
-while True:
-    # Capture frame-by-frame
-    is_recieved, frame = cap.read()
+# https://datahacker.rs/006-opencv-projects-how-to-detect-contours-and-match-shapes-in-an-image-in-python/
+# Trying to follow this tutorial
     
-    # if frame is read correctly, exit
-    if not is_recieved:
-        print("Can't receive frame (stream end?). Exiting ...")
-        break
+camera = Camera(0)
+# This tries to find the edges of
+# red objects
+pipe = Pipeline(
+        red_mask, # isolate red
+        grayscale, # convert to grayscale
+        gaussian_blur, # blur
+        lambda image: canny_edge(image, 70, 120), # edge enhance
+        dilate, # idk what this does
+        get_contours # return edges
+        )
 
-    # Convert to hsv
-    hsv = cv.cvtColor(frame, cv.COLOR_BGR2HSV)
+while (frame := camera.grab_frame()) is not None:
+    contours = pipe.process(frame)
+    # draw edges on top of original image
+    frame = draw_contours(frame, contours)
+    # show image on screen
+    show(frame)
 
-    # Mask of red
-    mask = red_mask(hsv)
 
-    # Harris corner detection
-
-    masked_image = cv.bitwise_and(frame, frame, mask=mask)
-
-    # Display the resulting frame
-    cv.imshow("frame", mask)
-    if cv.waitKey(1) == ord("q"):
-        break
-
-# When everything done, release the capture
-cap.release()
-cv.destroyAllWindows()
